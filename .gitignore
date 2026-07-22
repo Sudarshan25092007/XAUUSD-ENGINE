@@ -1,0 +1,40 @@
+# Python Virtual Environments
+venv/
+.venv/
+env/
+
+# IDE and Project Settings
+.vscode/
+.pyre_configuration
+.idea/
+*.suo
+*.user
+*.sln
+
+# Secrets and Local Configurations
+.env
+
+# Cache files
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Local runtime logs and database files
+logs/
+offline_data/
+archivedata/
+db/Tick_Data.csv
+db/*.csv
+
+# Local analytical, research, and backup scripts (Not in target structure)
+analysis/
+utils/
+scripts/
+apply_schema.py
+db_check.py
+mt5_connector.py
+
+# MT5 Client logs and temp files (if any get created)
+mt5/*.log
+mt5/*.tmp

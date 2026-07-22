@@ -1,0 +1,33 @@
+{
+  "_comment": "Manual news override. Add high-impact events when ForexFactory is blocked (403).",
+  "_format": "event_time is in UTC (24h). pre_minutes/post_minutes define the blackout window.",
+  "events": [
+    {
+      "date": "2026-03-20",
+      "time_utc": "07:00",
+      "currency": "EUR",
+      "impact": "MEDIUM",
+      "title": "Buba President Nagel Speaks",
+      "pre_minutes": 5,
+      "post_minutes": 5
+    },
+    {
+      "date": "2026-03-20",
+      "time_utc": "07:00",
+      "currency": "GBP",
+      "impact": "HIGH",
+      "title": "GBP Retail Sales",
+      "pre_minutes": 10,  
+      "post_minutes": 10
+    },
+    {
+      "date": "2026-03-20",
+      "time_utc": "13:00",
+      "currency": "USD",
+      "impact": "HIGH",
+      "title": "USD Core Retail Sales",
+      "pre_minutes": 15,
+      "post_minutes": 15
+    }
+  ]
+}

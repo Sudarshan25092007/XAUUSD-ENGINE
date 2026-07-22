@@ -1,0 +1,7 @@
+pytz
+psycopg2-binary
+requests
+python-dotenv
+beautifulsoup4
+cloudscraper
+pandas

@@ -1,0 +1,22 @@
+services:
+  xauusd-engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: xauusd_trading_engine
+    restart: always # Ensure it runs 24/7, restarting on crash/reboot
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    env_file:
+      - ../.env
+    ports:
+      - "5555:5555" # Mount MT5 Native Bridge loopback port
+    volumes:
+      # Map offline data and sqlite/csv persistence db directories
+      - ../offline_data:/app/offline_data
+      - ../db:/app/db
+    environment:
+      - PYTHONUNBUFFERED=1 # Real-time Docker logging output
+      - BIND_HOST=0.0.0.0   # Open to all interfaces inside container
+      - TZ=UTC             # Force UTC timezone for uniform financial telemetry
