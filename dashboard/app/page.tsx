@@ -177,7 +177,6 @@ export default function DashboardPage() {
             <span>Ghost Position Safety Heartbeat</span>
           </div>
           <div className="flex items-center gap-4 text-neutral-400">
-            <span>Prop Firm Ready: Legion Funding / TopG Traders</span>
             <span>{mounted ? `UTC: ${new Date().toISOString().slice(11, 19)}` : 'UTC: ACTIVE'}</span>
           </div>
         </div>
