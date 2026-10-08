@@ -140,12 +140,34 @@ docker logs -f xauusd_trading_engine
 
 ---
 
+## Live Analytics Dashboard
+
+A read-only, dark-themed prop-desk web terminal built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, and **Recharts**. It visualizes real-time market microstructure telemetry, statistical momentum gates, and decision logs directly from Supabase (with full offline demo fallback).
+
+- 🔗 **Live Demo URL**: [https://xauusd-analytics.vercel.app](https://xauusd-analytics.vercel.app) *(Deployable on Vercel)*
+- 📊 **1-Second High-Frequency Candles**: Sliding-window OHLCV and tick volume curves.
+- ⚡ **Statistical Regime Monitor**: Real-time $\mu + 1.5\sigma$ impulse spikes and $\mu + 4\sigma$ Density Shield caps.
+- 🧭 **Directional Imbalance**: Order-flow buy/sell delta tracking with choppy market filter bands.
+- ✈️ **Decisions Flight Recorder**: Real-time audit log of every order execution and reason for block.
+- 🛡️ **Position Reconciliation**: Live ledger and 10-second terminal heartbeat sync verification.
+
+### Run Dashboard Locally
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view the analytics terminal.
+
+---
+
 ## Project Structure
 
 ```
 XAUUSD_ENGINE/
 ├── candles/              # 1-second candle aggregation and session mapping
 ├── config/               # Session thresholds (regime_config.json) & news filters
+├── dashboard/            # Next.js 16 read-only live analytics prop terminal
 ├── db/                   # Connection pooling, repositories, schema, and CSV loggers
 ├── docker/               # Dockerfile and Docker Compose configurations
 ├── engine/               # Trade tracking, breakeven adjustments, and order state

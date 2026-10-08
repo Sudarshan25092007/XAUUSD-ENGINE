@@ -38,3 +38,9 @@ mt5_connector.py
 # MT5 Client logs and temp files (if any get created)
 mt5/*.log
 mt5/*.tmp
+
+# Node / Next.js
+node_modules/
+**/node_modules/
+.next/
+**/.next/
