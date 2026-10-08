@@ -1,126 +1,164 @@
-# XAUUSD High-Frequency Ingestion Engine
+# XAUUSD High-Frequency Trading Engine
 
-A low-latency, event-driven backend infrastructure designed to bridge MetaTrader 5 (MT5) with a stateful Python analytics engine. It processes tick telemetry, synthesizes sliding 1-second candles, and executes real-time statistical regime detection and adverse selection shields.
-
----
-
-## 🌟 Core System Architecture
-
-The engine functions across four distinct layers to ensure separation of concerns, transactional integrity, and low processing latency:
-
-```
-┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-│ 1. DATA SOURCE  │  TCP  │   2. INGESTION  │ Memory│  3. PROCESSING  │  Pool │ 4. PERSISTENCE  │
-│  (MT5 Terminal) ├──────►│  (Python Bridge)├──────►│  (Engine Core)  ├──────►│   (Supabase)    │
-│  [Unreliable]   │       │   [Persistent]  │       │   [Stateless]   │  Async│ [Degraded Fallback]
-└─────────────────┘       └─────────────────┘       └─────────────────┘       └─────────────────┘
-```
-
-1. **Ingestion Layer (MQL5 EA)**: Establishes a raw tick capture interface on the MT5 trading client, pushing bid/ask changes over a native loopback TCP connection.
-2. **Bridging Layer (Python Sockets)**: Maintains an asynchronous client loop that frames TCP stream boundaries using newline-delimited JSON slicing, eliminating partial-read fragmentation.
-3. **Decision Core (asyncio)**: Performs stateless arithmetic processing including sliding-window EMA calculation, momentum impulse detection, and risk/gate checks.
-4. **Persistence Layer (PostgreSQL)**: Handles asynchronous DB logging of tick histories and analytical candles via a connection pooler, featuring a 2-second timeout switch that gracefully degrades to local CSV logs if the database is unreachable.
+**A low-latency, event-driven trading engine that connects MetaTrader 5 with Python to process real-time Gold (XAUUSD) tick data, detect high-momentum market impulses, and execute trades safely.**
 
 ---
 
-## 📂 Repository Directory Layout
+## Key Features
 
-```
-XAUUSD_ENGINE/
-├── engine/                    # Core Analytical Logic (No I/O)
-│   └── trade_engine.py        # Local trade tracking, breakeven adjustments
-│
-├── stream/                    # Ingestion Pipeline
-│   ├── tick_stream.py         # Thread-safe live tick buffer
-│   └── news_circuit_breaker.py # USD high-impact economic news filter
-│
-├── candles/                   # Telemetry Synthesis
-│   └── candle_aggregator.py   # Sliding 1s window aggregator and session mapper
-│
-├── signals/                   # Quant Signal Layer
-│   └── impulse_detector.py    # Raw impulse detection calculations
-│
-├── db/                        # Persistence Layer (Fault-Tolerant)
-│   ├── db.py                  # psycopg2 connection pool with timeout & offline toggle
-│   ├── tick_repository.py     # Batch inserts for raw tick data
-│   ├── candle_repository.py   # Asynchronous candle storer
-│   ├── impulse_repository.py  # Statistical anomaly audit logger
-│   ├── decision_logger.py     # Local CSV fallback decision logger
-│   └── schema.sql             # PostgreSQL database DDL definitions
-│
-├── mt5/                       # Execution and Ingestion Terminal EA
-│   ├── ExecutionBridge.mq5    # MQL5 TCP client (Sends ticks, parses orders)
-│   └── ExecutionBridge.ex5    # Compiled MQL5 execution binary
-│
-├── storage/                   # Cold Storage & Analysis
-│   └── _offline_regime_analyzer.py # Script deriving μ and σ from database csv exports
-│
-├── config/                    # System Settings
-│   ├── regime_config.json     # Dynamically loaded session parameters
-│   └── news_config.json       # Manual news event fallbacks (ForexFactory block)
-│
-├── docker/                    # Infrastructure Containerization
-│   ├── Dockerfile             # Multi-stage Python build
-│   └── docker-compose.yml     # Service orchestrator (engine container + network)
-│
-├── CASE_STUDY.md              # Backend Systems Engineering Case Study (Detailed explanation)
-├── main.py                    # Engine main entrypoint & listen loop
-└── requirements.txt           # Python application dependencies
-```
+- **Real-Time TCP Socket Bridge**: Streams live tick data between MetaTrader 5 and Python over a local TCP socket (`port 5555`) with newline-delimited JSON framing.
+- **1-Second Candle Synthesis**: Aggregates sub-second ticks into clean, sliding 1-second OHLCV candles with real-time volume and spread metrics.
+- **Statistical Impulse Detection**: Filters out market noise by entering trades only during statistical momentum spikes ($\mu + 1.5\sigma$ tick density).
+- **News Circuit Breaker**: Automatically suspends trading 15 minutes before and after high-impact USD economic events.
+- **Dynamic Session Risk**: Scales Stop-Loss (SL) and Take-Profit (TP) levels dynamically based on active trading sessions (London, New York, Tokyo).
+- **Ghost Position Protection**: Reconciles active positions with the MT5 terminal every 10 seconds to auto-close unmanaged or conflicting trades.
+- **Fail-Safe Persistence**: Saves tick and candle histories asynchronously to PostgreSQL/Supabase, falling back to local CSV storage if the database disconnects.
 
 ---
 
-## 🚀 Getting Started
+## How It Works
 
-### 1. Prerequisites
-- **Python**: Version 3.11 or later
-- **MetaTrader 5 Client Terminal**: Installed on Windows (required for socket client bridge)
-- **PostgreSQL Database**: Supabase or any PostgreSQL 15 instance
+The engine runs as an event-driven loop that separates market data ingestion, quantitative analysis, risk validation, and order execution:
 
-### 2. Database Schema Setup
-Apply the DDL schema to your PostgreSQL database instance using the SQL script provided in the repository:
+```
+┌──────────────────┐       TCP / JSON       ┌──────────────────────┐
+│  MT5 Terminal    ├───────────────────────►│  Python TCP Server   │
+│ (ExecutionBridge)│                        │      (Port 5555)     │
+└────────▲─────────┘                        └──────────┬───────────┘
+         │                                             │
+         │ Orders / Sync                               ▼
+┌────────┴─────────┐   Passed Risk / News   ┌──────────────────────┐
+│ Trade Execution  │◄───────────────────────┤ 1s Candle Synthesis  │
+│  & Ghost Buster  │                        │  & Impulse Detection │
+└────────┬─────────┘                        └──────────┬───────────┘
+         │                                             │
+         ▼                                             ▼
+┌──────────────────┐                        ┌──────────────────────┐
+│ PostgreSQL DB    │◄─── Async Logging ─────┤ Local CSV Fallback   │
+│  (Supabase/Neon) │     (Fast Failover)    │   (Offline Buffer)   │
+└──────────────────┘                        └──────────────────────┘
+```
+
+1. **Capture**: The MT5 Expert Advisor (`ExecutionBridge.mq5`) captures live bid/ask quotes and sends them to Python over a local TCP socket.
+2. **Aggregate**: Python normalizes timestamps to strict UTC and aggregates incoming ticks into rolling 1-second candles.
+3. **Detect**: The impulse detector measures tick density and price acceleration against pre-calculated session baselines.
+4. **Filter**: Risk modules verify that the spread is within bounds and confirm that no high-impact USD news events are active.
+5. **Execute & Reconcile**: Orders are dispatched to MT5 with session-specific SL/TP targets. A 10-second sync loop checks terminal state and clears ghost positions.
+6. **Persist**: All ticks, candles, and signals are written to PostgreSQL. If the database lags or disconnects, the engine switches to local CSV files without interrupting trading.
+
+---
+
+## Prerequisites
+
+| Tool | Version / Requirement | Purpose |
+|---|---|---|
+| **Python** | 3.11+ | Runs the ingestion engine, risk gates, and TCP server |
+| **MetaTrader 5** | Desktop Client (Windows) | Broker terminal for market data and trade execution |
+| **PostgreSQL** | 15+ (Local or Supabase) | Stores tick archives, 1-second candles, and trade records |
+| **Docker & Compose** | Optional | Runs the engine inside an isolated Linux container |
+
+---
+
+## Installation & Setup
+
+### 1. Clone the Repository
 ```bash
-psql -h <db-host> -U <db-user> -d <db-name> -f db/schema.sql
+git clone https://github.com/Sudarshan25092007/XAUUSD-ENGINE.git
+cd XAUUSD-ENGINE
 ```
 
-### 3. Environment Configuration
-Create a `.env` file in the root directory:
+### 2. Set Up a Python Virtual Environment
+```bash
+# Create the virtual environment
+python -m venv venv
+
+# Activate on Windows (PowerShell)
+.\venv\Scripts\Activate.ps1
+
+# Activate on Linux / macOS
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment Variables
+Create a `.env` file in the project root:
 ```env
 DATABASE_URL="postgresql://username:password@hostname:5432/dbname?sslmode=require"
 BIND_HOST="127.0.0.1"
 ```
+> **Note**: If `DATABASE_URL` is omitted, the engine automatically operates in **Offline Mode** and writes data directly to local CSV files.
 
-### 4. Running the Engine Locally
-Install dependencies:
+### 5. Apply the Database Schema
 ```bash
-pip install -r requirements.txt
+python apply_schema.py
 ```
-Run the Python TCP bridge and processing thread:
+*(Alternatively, apply using `psql`: `psql -h <host> -U <user> -d <dbname> -f db/schema.sql`)*
+
+---
+
+## How to Use
+
+### Step 1: Configure MetaTrader 5
+1. Copy `mt5/ExecutionBridge.mq5` into your MT5 terminal directory: `MQL5/Experts/`.
+2. Compile the EA in MetaEditor (or use the precompiled `mt5/ExecutionBridge.ex5`).
+3. In MT5, open **Tools > Options > Expert Advisors** and enable:
+   - **Allow Algo Trading**
+   - **Allow DLL imports**
+4. Attach `ExecutionBridge` to an active **XAUUSD** chart.
+
+### Step 2: Start the Engine
+
+#### Option A: Run Locally
 ```bash
 python main.py
 ```
+*The engine initializes on port `5555` and waits for MT5 to connect.*
 
-### 5. Running via Docker Compose
-Build and start the containerized engine:
+#### Option B: Run with Docker Compose
 ```bash
+# Build and run container in background
 docker compose -f docker/docker-compose.yml up --build -d
+
+# View live container output
+docker logs -f xauusd_trading_engine
 ```
 
-### 6. MetaTrader 5 Bridge Activation
-- Move `mt5/ExecutionBridge.mq5` into your MetaTrader 5 terminal's `MQL5/Experts/` directory.
-- Open MT5, allow DLL imports, and attach the Expert Advisor (EA) to an active **XAUUSD** chart.
-- The EA will automatically connect to loopback port `5555` and begin pushing real-time tick events.
+### Step 3: Utility Commands
+
+- **Check Database Connection & Tables**:
+  ```bash
+  python db_check.py
+  ```
+- **Recalculate Session Regime Parameters**:
+  ```bash
+  python storage/_offline_regime_analyzer.py
+  ```
 
 ---
 
-## 🛡️ Systems Engineering Design Highlights
+## Project Structure
 
-- **TCP Message Framing**: By using newline delimiters (`\n`) for stream boundaries, we guarantee zero JSON parsing crashes even under high message-rate densities exceeding 3,000 packets/minute.
-- **Fail-Safe Persistence (Offline Fast-Track)**: The database repository monitors write operations. If a query lags or timeout exceeds 2 seconds, it switches global states to run off inline CSV buffers, preventing the socket threads from freezing.
-- **Active Position Heartbeats (Ghost Buster)**: Every 10 seconds, Python initiates a positions reconciliation check. In case of unexpected server crashes, it queries the MT5 terminal state and matches it with local counts, clearing any unmanaged ("ghost") positions immediately.
-- **Statistically-Gated Momentum Checks**: Instead of standard indicators, the decision loop checks tick frequency density against historical baselines ($\mu + 1.5\sigma$) to only participate in the top 7% of momentum spikes.
+```
+XAUUSD_ENGINE/
+├── candles/              # 1-second candle aggregation and session mapping
+├── config/               # Session thresholds (regime_config.json) & news filters
+├── db/                   # Connection pooling, repositories, schema, and CSV loggers
+├── docker/               # Dockerfile and Docker Compose configurations
+├── engine/               # Trade tracking, breakeven adjustments, and order state
+├── mt5/                  # MetaTrader 5 MQL5 Execution Bridge EA (source and binary)
+├── signals/              # Statistical momentum and impulse detectors
+├── storage/              # Offline regime analyzer and analytical scripts
+├── stream/               # Live tick stream buffer and USD news circuit breaker
+├── apply_schema.py       # Helper script to apply database schema
+├── db_check.py           # Verification script for database tables and connectivity
+├── main.py               # Main engine entrypoint and async TCP listen loop
+└── requirements.txt      # Python package dependencies
+```
 
 ---
 
-## 📚 Systems Case Study
-For a comprehensive architectural breakdown, systems failure log, resume impact points, and interview vulnerability audits, refer to the [CASE_STUDY.md](CASE_STUDY.md) file in the root of this repository.
+> 📖 **Deep Dive**: For an in-depth architecture case study, failure modes analysis, and performance benchmarks, see [CASE_STUDY.md](CASE_STUDY.md).

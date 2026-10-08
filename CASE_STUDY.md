@@ -1,5 +1,5 @@
 # XAUUSD High-Frequency Ingestion Engine: Backend Infrastructure & Systems Engineering Case Study
-**Date:** 2026-07-09  
+**Date:** Approx. Mid-2026  
 **Status:** Hardened Production Infrastructure  
 **Author:** Sudarshan Patil, Backend Infrastructure Engineer  
 
@@ -259,10 +259,11 @@ XAUUSD_ENGINE/
 │   └── trade_engine.py        # Local trade tracking, breakeven adjustments
 │
 ├── stream/                    # Ingestion Pipeline
-│   └── tick_stream.py         # Thread-safe live tick buffer
+│   ├── tick_stream.py         # Thread-safe live tick buffer
+│   └── news_circuit_breaker.py # USD high-impact economic news filter
 │
 ├── candles/                   # Telemetry Synthesis
-│   └── candle_aggregator.py   # Sliding 1s window aggregator
+│   └── candle_aggregator.py   # Sliding 1s window aggregator and session mapper
 │
 ├── signals/                   # Quant Signal Layer
 │   └── impulse_detector.py    # Raw impulse detection calculations
@@ -283,16 +284,17 @@ XAUUSD_ENGINE/
 │   └── _offline_regime_analyzer.py # Script deriving μ and σ from database csv exports
 │
 ├── config/                    # System Settings
-│   └── regime_config.json     # Dynamically loaded session parameters
+│   ├── regime_config.json     # Dynamically loaded session parameters
+│   └── news_config.json       # USD high-impact news event configuration
 │
 ├── docker/                    # Infrastructure Containerization
 │   ├── Dockerfile             # Multi-stage Python build
 │   └── docker-compose.yml     # Service orchestrator (engine container + network)
 │
-└── z-Reports/                 # Case Studies and Audits
-    ├── analysis_results.md    # Competitor analysis & market grading
-    ├── ENGINE_STATUS.md       # Initial audit report (May 2026)
-    └── XAUUSD_972026          # THIS CASE STUDY
+├── CASE_STUDY.md              # THIS SYSTEMS CASE STUDY
+├── README.md                  # Quick-start project documentation & guide
+├── main.py                    # Engine main entrypoint & listen loop
+└── requirements.txt           # Python application dependencies
 ```
 
 #### Rationale for Domain Separation:
